@@ -68,24 +68,24 @@ The simulation runs in discrete **ticks**, each representing a "moment" in inter
 The project follows a modular architecture with a clear separation between the simulation engine, GPU computation layer, web server, and frontend:
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    Flask Web Server                       │
-│  (server.py — routes, SSE, API endpoints)                │
-├──────────────┬───────────────────────┬───────────────────┤
-│              │                       │                   │
-│  ┌───────────▼──────────┐  ┌────────▼────────┐  ┌──────▼──────┐
-│  │   Core Simulation    │  │  GPU Backend    │  │  Frontend   │
-│  │                      │  │                 │  │             │
-│  │  • Agent System      │  │  • PyTorch NN   │  │  • HTML/JS  │
-│  │  • Content System    │  │  • CUDA Tensors │  │  • CSS      │
-│  │  • Attention Engine  │  │  • NumPy Fallback│  │  • Chart.js │
-│  │  • Meme Evolution    │  │                 │  │  • SSE      │
-│  │  • Community Detect  │  └─────────────────┘  └─────────────┘
-│  │  • Language Drift    │
-│  │  • Metrics Tracker   │
-│  │  • Meme Generator    │
-│  └──────────────────────┘
-└──────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Flask Web Server                                 │ 
+│  (server.py — routes, SSE, API endpoints)                           │
+├──────────────┬──────────────────────┬──────────────────┬────────────┤
+│              │                      │                  │            │
+│  ┌───────────▼──────────┐  ┌────────▼─────── ─┐  ┌──────▼──────┐    │
+│  │   Core Simulation    │  │  GPU Backend     │  │  Frontend   │    │
+│  │                      │  │                  │  │             │    │
+│  │  • Agent System      │  │  • PyTorch NN    │  │  • HTML/JS  │    │
+│  │  • Content System    │  │  • CUDA Tensors  │  │  • CSS      │    │
+│  │  • Attention Engine  │  │  • NumPy Fallback│  │  • Chart.js │    │
+│  │  • Meme Evolution    │  │                  │  │  • SSE      │    │
+│  │  • Community Detect  │  └───────────────── ┘  └─────────────┘    │
+│  │  • Language Drift    │                                           │
+│  │  • Metrics Tracker   │                                           │
+│  │  • Meme Generator    │                                           │
+│  └──────────────────────┘                                           │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
