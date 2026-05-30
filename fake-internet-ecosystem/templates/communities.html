@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% set page = "communities" %}
+
+{% block content %}
+<div class="main-header">
+  <h2>🏘️ Communities</h2>
+</div>
+
+<div style="padding:16px">
+  <div id="commEmpty" class="empty-state">
+    <div class="icon">🏘️</div>
+    <h3>No communities yet</h3>
+    <p>Run the simulation to see communities form</p>
+  </div>
+  <div id="commMeta" style="display:none;margin-bottom:16px">
+    <div style="display:flex;gap:12px;flex-wrap:wrap" id="commSummaryCards"></div>
+  </div>
+  <div id="commContainer"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', loadCommunities);
+
+  function loadCommunities() {
+    fetch('/api/communities').then(r => r.json()).then(data => {
+      const container = document.getElementById('commContainer');
+      const empty = document.getElementById('commEmpty');
+      const meta = document.getElementById('commMeta');
+      const cards = document.getElementById('commSummaryCards');
+
+      if (!data.communities || data.communities.length === 0) {
+        empty.style.display = '';
+        meta.style.display = 'none';
+        return;
+      }
+      empty.style.display = 'none';
+      meta.style.display = '';
+
+      // Summary cards
+      cards.innerHTML = `
+        <div class="metric-card"><div class="metric-value">${data.communities.length}</div><div class="metric-label">Communities</div></div>
+        <div class="metric-card"><div class="metric-value">${data.ecosystem_polarization.toFixed(2)}</div><div class="metric-label">Polarization</div></div>
+      `;
+
+      // Community cards
+      container.innerHTML = data.communities.map(c => {
+        const polColor = c.polarization > 0.7 ? 'var(--red)' : c.polarization > 0.4 ? 'var(--orange)' : 'var(--green)';
+        const members = (c.members || []).slice(0, 10).map(m => `
+          <span class="dialect-tag">${esc(m.name)} <span style="font-size:11px;color:var(--text-secondary)">${m.personality}</span>${m.is_bot ? ' 🤖' : ''}</span>
+        `).join('');
+
+        const dialect = Object.entries(c.dialect || {}).map(([k, v]) => `
+          <span class="dialect-tag" style="color:var(--pink)">${esc(k)} → ${esc(v)}</span>
+        `).join('');
+
+        const slang = (c.slang || []).map(s => `
+          <span class="dialect-tag" style="color:var(--green)">${esc(s)}</span>
+        `).join('');
+
+        const topWords = (c.top_words || []).slice(0, 8).map(([w, n]) => `
+          <span class="dialect-tag">${esc(w)} <span style="color:var(--text-secondary)">${n}</span></span>
+        `).join('');
+
+        return `
+        <div class="community-card fade-in">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <h3>🏘️ ${esc(c.name)}</h3>
+            <span style="font-size:14px;color:var(--text-secondary)">${c.size} members</span>
+          </div>
+          <div class="community-stat">
+            <span>Echo Chamber Index</span>
+            <span class="val" style="color:${polColor}">${(c.polarization * 100).toFixed(0)}%</span>
+          </div>
+          <div class="polarization-bar">
+            <div class="polarization-fill" style="width:${c.polarization * 100}%;background:${polColor}"></div>
+          </div>
+          ${members ? `<div style="margin-top:12px"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">Members</div>${members}</div>` : ''}
+          ${dialect ? `<div style="margin-top:12px"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">🗣️ Dialect Mappings</div>${dialect}</div>` : ''}
+          ${slang ? `<div style="margin-top:12px"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">🆕 Adopted Slang</div>${slang}</div>` : ''}
+          ${topWords ? `<div style="margin-top:12px"><div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">📝 Top Words</div>${topWords}</div>` : ''}
+        </div>`;
+      }).join('');
+    });
+  }
+</script>
+{% endblock %}

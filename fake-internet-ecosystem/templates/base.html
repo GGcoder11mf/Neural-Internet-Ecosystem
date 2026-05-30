@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FakeNet</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+<div class="app-layout">
+  <!-- LEFT SIDEBAR -->
+  <nav class="sidebar-left">
+    <div class="logo">🌐</div>
+    <a href="/" class="nav-item {% if page=='home' %}active{% endif %}">
+      <span class="icon">🏠</span><span class="nav-text">Home</span>
+    </a>
+    <a href="/explore" class="nav-item {% if page=='explore' %}active{% endif %}">
+      <span class="icon">🔍</span><span class="nav-text">Explore</span>
+    </a>
+    <a href="/communities" class="nav-item {% if page=='communities' %}active{% endif %}">
+      <span class="icon">🏘️</span><span class="nav-text">Communities</span>
+    </a>
+    <a href="/memes" class="nav-item {% if page=='memes' %}active{% endif %}">
+      <span class="icon">🧬</span><span class="nav-text">Memes</span>
+    </a>
+    <a href="/analytics" class="nav-item {% if page=='analytics' %}active{% endif %}">
+      <span class="icon">📊</span><span class="nav-text">Analytics</span>
+    </a>
+    <div style="flex:1"></div>
+    <div class="sim-controls-mini">
+      <div class="tick-counter">
+        Tick <span class="tick-num" id="tickNum">0</span>
+      </div>
+      
+      <!-- Auto-tick controls -->
+      <div class="auto-tick-controls">
+        <div class="auto-tick-row">
+          <button class="btn btn-accent btn-sm" id="btnAutoStart" onclick="startAutoTick()">▶ Live</button>
+          <button class="btn btn-danger btn-sm" id="btnAutoStop" onclick="stopAutoTick()" disabled>⏸ Pause</button>
+        </div>
+        <div class="speed-control">
+          <label>Speed</label>
+          <input type="range" id="rSpeed" min="2" max="10" step="1" value="1" oninput="updateSpeed(this.value)" style="width:80px">
+          <span class="value" id="speedVal">1s</span>
+        </div>
+      </div>
+      
+      <button class="btn btn-green" style="width:100%;margin-bottom:4px" onclick="doTick(1)">▶ Run Tick</button>
+      <button class="btn" style="width:100%;margin-bottom:4px" onclick="doTick(10)">⏩ Run 10</button>
+      <button class="btn btn-orange" style="width:100%;margin-bottom:8px" onclick="doTick(50)">🚀 Run 50</button>
+      
+      <!-- Neural Net Status -->
+      <div class="nn-status" id="nnStatus" style="display:none">
+        <div class="nn-indicator" id="nnIndicator"></div>
+        <span id="nnText">Neural Net: --</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- RIGHT SIDEBAR -->
+  <aside class="sidebar-right">
+    <div class="search-box">
+      <input type="text" placeholder="Search FakeNet" disabled>
+    </div>
+
+    <!-- SIM SETUP CARD -->
+    <div class="card" id="setupCard">
+      <div class="card-header">⚙️ Simulation Setup</div>
+      <div class="card-body">
+        <div class="control-row">
+          <label>Agents</label>
+          <input type="range" id="rAgents" min="10" max="200" step="10" value="50" oninput="this.nextElementSibling.textContent=this.value">
+          <span class="value">50</span>
+        </div>
+        <div class="control-row">
+          <label>Topics</label>
+          <input type="range" id="rTopics" min="5" max="50" step="5" value="20" oninput="this.nextElementSibling.textContent=this.value">
+          <span class="value">20</span>
+        </div>
+        <div class="control-row">
+          <label>Bots %</label>
+          <input type="range" id="rBots" min="0" max="40" step="5" value="10" oninput="this.nextElementSibling.textContent=(this.value/100).toFixed(2)">
+          <span class="value">0.10</span>
+        </div>
+        <div class="control-row">
+          <label>Echo Chamber</label>
+          <input type="range" id="rEcho" min="0" max="100" step="5" value="50" oninput="this.nextElementSibling.textContent=(this.value/100).toFixed(2)">
+          <span class="value">0.50</span>
+        </div>
+        <div class="control-row">
+          <label>Virality</label>
+          <input type="range" id="rViral" min="10" max="300" step="10" value="100" oninput="this.nextElementSibling.textContent=(this.value/100).toFixed(1)">
+          <span class="value">1.0</span>
+        </div>
+        <div class="control-row">
+          <label>Decay</label>
+          <input type="range" id="rDecay" min="80" max="99" step="1" value="95" oninput="this.nextElementSibling.textContent=(this.value/100).toFixed(2)">
+          <span class="value">0.95</span>
+        </div>
+        <div class="control-row">
+          <label>Mutation Rate</label>
+          <input type="range" id="rMut" min="0" max="100" step="5" value="30" oninput="this.nextElementSibling.textContent=(this.value/100).toFixed(2)">
+          <span class="value">0.30</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-accent" onclick="createSim()">🆕 Create</button>
+          <button class="btn btn-danger" onclick="resetSim()">🔄 Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SENTIMENT WAVE CARD -->
+    <div class="card" id="waveCard" style="display:none">
+      <div class="card-header">🌊 Sentiment Wave</div>
+      <div class="card-body" id="waveBody"></div>
+    </div>
+
+    <!-- TRENDING CARD -->
+    <div class="card" id="trendingCard">
+      <div class="card-header">🔥 Trends for you</div>
+      <div class="card-body" id="trendingBody">
+        <div style="color:var(--text-secondary);font-size:14px;padding:8px 0">Create a simulation to see trends</div>
+      </div>
+    </div>
+
+    <!-- PLATFORM STATUS -->
+    <div class="card" id="platformCard" style="display:none">
+      <div class="card-header">📡 Platform Algorithm</div>
+      <div class="card-body" id="platformBody"></div>
+    </div>
+
+    <div style="padding:16px;color:var(--text-secondary);font-size:13px">
+      FakeNet Ecosystem Simulator v3.0<br>
+      PyTorch Neural Net · Meme Images · Real-Time<br>
+      SSE · CUDA Acceleration
+    </div>
+  </aside>
+</div>
+
+<script src="/static/js/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

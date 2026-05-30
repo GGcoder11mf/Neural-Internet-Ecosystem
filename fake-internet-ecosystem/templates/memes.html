@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% set page = "memes" %}
+
+{% block content %}
+<div class="main-header">
+  <h2>🧬 Meme Lab</h2>
+</div>
+
+<div style="padding:16px">
+  <div id="memeEmpty" class="empty-state">
+    <div class="icon">🧬</div>
+    <h3>No memes yet</h3>
+    <p>Run the simulation to see memes evolve</p>
+  </div>
+
+  <div id="memeStats" style="display:none;margin-bottom:16px">
+    <div style="display:flex;gap:12px;flex-wrap:wrap" id="memeSummaryCards"></div>
+  </div>
+
+  <div id="memeFamilies" style="margin-bottom:24px"></div>
+  <h3 style="margin-bottom:12px;color:var(--text-secondary);font-size:15px">🧬 Top Memes by Attention</h3>
+  <div id="memeContainer"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', loadMemes);
+
+  function loadMemes() {
+    fetch('/api/memes').then(r => r.json()).then(data => {
+      const container = document.getElementById('memeContainer');
+      const empty = document.getElementById('memeEmpty');
+      const stats = document.getElementById('memeStats');
+      const cards = document.getElementById('memeSummaryCards');
+      const families = document.getElementById('memeFamilies');
+
+      if (!data.memes || data.memes.length === 0) {
+        empty.style.display = '';
+        stats.style.display = 'none';
+        return;
+      }
+      empty.style.display = 'none';
+      stats.style.display = '';
+
+      const s = data.stats || {};
+      cards.innerHTML = `
+        <div class="metric-card"><div class="metric-value">${data.memes.length}</div><div class="metric-label">Memes</div></div>
+        <div class="metric-card"><div class="metric-value">${s.total_mutations || 0}</div><div class="metric-label">Mutations</div></div>
+        <div class="metric-card"><div class="metric-value">${s.total_merges || 0}</div><div class="metric-label">Merges</div></div>
+        <div class="metric-card"><div class="metric-value">${s.num_families || 0}</div><div class="metric-label">Families</div></div>
+        <div class="metric-card"><div class="metric-value">${s.extinct_memes || 0}</div><div class="metric-label">Extinct</div></div>
+      `;
+
+      // Mutation type breakdown
+      const mtc = s.mutation_type_counts || {};
+      if (Object.keys(mtc).length > 0) {
+        families.innerHTML = `
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header">📊 Mutation Types</div>
+            <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+              ${Object.entries(mtc).map(([k, v]) => `<span class="mutation-tag mut-${k}" style="font-size:14px;padding:6px 14px">${k}: ${v}</span>`).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      // Meme list with images
+      container.innerHTML = data.memes.map(m => {
+        const mutTags = (m.mutation_types || []).map(t => `<span class="mutation-tag mut-${t}">${t}</span>`).join('');
+        const hashTags = (m.hashtags || []).map(h => `<span class="hashtag-tag">${esc(h)}</span>`).join('');
+        const controversyBadge = m.controversy > 0.3 ? '<span class="post-badge badge-controversial" style="margin-left:4px">🌶️</span>' : '';
+        const distortBadge = m.distortion > 0.1 ? `<span class="post-badge badge-distort" style="margin-left:4px">📢 ${m.distortion.toFixed(1)}</span>` : '';
+        
+        // Meme image
+        let memeImage = '';
+        if (m.image_path) {
+          memeImage = `<div class="post-image-container"><img class="post-image" src="/static/${esc(m.image_path)}" alt="meme" loading="lazy" onerror="this.style.display='none'"></div>`;
+        }
+        
+        return `
+        <div class="meme-node fade-in">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span class="gen-badge">Gen ${m.generation}</span>
+              <span style="font-weight:600">${esc(m.author)}</span>
+              ${controversyBadge}${distortBadge}
+            </div>
+            <span style="font-size:13px;color:var(--accent)">⚡ ${m.attention}</span>
+          </div>
+          <div class="text">${esc(m.text)}</div>
+          ${memeImage}
+          ${hashTags ? '<div class="post-hashtags">' + hashTags + '</div>' : ''}
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            ${mutTags}
+            <span class="meta" style="margin-left:auto">👁️ ${m.views} · 🔁 ${m.reposts} · ❤️ ${m.likes}</span>
+          </div>
+        </div>`;
+      }).join('');
+    });
+  }
+</script>
+{% endblock %}

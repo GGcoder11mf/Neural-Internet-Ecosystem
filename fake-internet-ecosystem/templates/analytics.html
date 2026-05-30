@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% set page = "analytics" %}
+
+{% block content %}
+<div class="main-header">
+  <h2>📊 Analytics</h2>
+</div>
+
+<div id="analyticsEmpty" class="empty-state">
+  <div class="icon">📊</div>
+  <h3>No data yet</h3>
+  <p>Run the simulation to see analytics</p>
+</div>
+
+<div id="analyticsContent" style="display:none">
+  <!-- SUMMARY METRICS -->
+  <div class="metrics-grid" id="metricsGrid"></div>
+
+  <!-- CHARTS -->
+  <div class="chart-container">
+    <h3 style="margin-bottom:12px">⚡ Attention Over Time</h3>
+    <canvas id="chartAttention" height="200"></canvas>
+  </div>
+
+  <div class="chart-container">
+    <h3 style="margin-bottom:12px">📈 Gini Coefficient (Attention Inequality)</h3>
+    <canvas id="chartGini" height="200"></canvas>
+  </div>
+
+  <div style="display:flex;gap:12px;padding:0 16px;flex-wrap:wrap">
+    <div class="chart-container" style="flex:1;min-width:300px">
+      <h3 style="margin-bottom:12px">🏘️ Communities Over Time</h3>
+      <canvas id="chartCommunities" height="200"></canvas>
+    </div>
+    <div class="chart-container" style="flex:1;min-width:300px">
+      <h3 style="margin-bottom:12px">🗣️ Language Divergence</h3>
+      <canvas id="chartLanguage" height="200"></canvas>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;padding:0 16px;flex-wrap:wrap">
+    <div class="chart-container" style="flex:1;min-width:300px">
+      <h3 style="margin-bottom:12px">🌶️ Controversy & Distortion</h3>
+      <canvas id="chartControversy" height="200"></canvas>
+    </div>
+    <div class="chart-container" style="flex:1;min-width:300px">
+      <h3 style="margin-bottom:12px">🤖 Bot Content Fraction</h3>
+      <canvas id="chartBotContent" height="200"></canvas>
+    </div>
+  </div>
+
+  <div class="chart-container">
+    <h3 style="margin-bottom:12px">🧍 Agent Personality Distribution</h3>
+    <canvas id="chartPersonality" height="200"></canvas>
+  </div>
+
+  <div class="chart-container">
+    <h3 style="margin-bottom:12px">👑 Influencer Dominance Over Time</h3>
+    <canvas id="chartInfluencer" height="200"></canvas>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let charts = {};
+
+  document.addEventListener('DOMContentLoaded', loadAnalytics);
+
+  function loadAnalytics() {
+    fetch('/api/analytics').then(r => r.json()).then(data => {
+      const empty = document.getElementById('analyticsEmpty');
+      const content = document.getElementById('analyticsContent');
+
+      if (!data.history || !data.history.ticks || data.history.ticks.length === 0) {
+        empty.style.display = '';
+        content.style.display = 'none';
+        return;
+      }
+      empty.style.display = 'none';
+      content.style.display = '';
+
+      // Summary metrics
+      const h = data.history;
+      const latest = data.latest || {};
+      const grid = document.getElementById('metricsGrid');
+      grid.innerHTML = `
+        <div class="metric-card"><div class="metric-value">${data.total_posts_created}</div><div class="metric-label">Posts Created</div></div>
+        <div class="metric-card"><div class="metric-value">${data.total_reposts}</div><div class="metric-label">Reposts</div></div>
+        <div class="metric-card"><div class="metric-value">${data.total_likes || 0}</div><div class="metric-label">Likes</div></div>
+        <div class="metric-card"><div class="metric-value">${data.total_memes}</div><div class="metric-label">Memes</div></div>
+        <div class="metric-card"><div class="metric-value">${data.total_mutations}</div><div class="metric-label">Mutations</div></div>
+        <div class="metric-card"><div class="metric-value">${(latest.mean_attention || 0).toFixed(3)}</div><div class="metric-label">Mean Attention</div></div>
+        <div class="metric-card"><div class="metric-value">${(latest.attention_gini || 0).toFixed(3)}</div><div class="metric-label">Attention Gini</div></div>
+        <div class="metric-card"><div class="metric-value">${latest.num_communities || 0}</div><div class="metric-label">Communities</div></div>
+        <div class="metric-card"><div class="metric-value">${(latest.ecosystem_polarization || 0).toFixed(3)}</div><div class="metric-label">Polarization</div></div>
+        <div class="metric-card"><div class="metric-value">${(latest.mean_controversy || 0).toFixed(3)}</div><div class="metric-label">Mean Controversy</div></div>
+        <div class="metric-card"><div class="metric-value">${latest.ratioed_count || 0}</div><div class="metric-label">Ratio'd Posts</div></div>
+        <div class="metric-card"><div class="metric-value">${(latest.mean_distortion || 0).toFixed(3)}</div><div class="metric-label">Mean Distortion</div></div>
+      `;
+
+      // Chart defaults
+      Chart.defaults.color = '#71767b';
+      Chart.defaults.borderColor = '#2f3336';
+      Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+      // Attention chart
+      makeChart('chartAttention', {
+        type: 'line',
+        data: {
+          labels: h.ticks,
+          datasets: [
+            { label: 'Mean', data: h.mean_attention, borderColor: '#1d9bf0', fill: true, backgroundColor: 'rgba(29,155,240,0.1)', tension: 0.3, pointRadius: 0 },
+            { label: 'Max', data: h.max_attention, borderColor: '#f91880', fill: false, tension: 0.3, pointRadius: 0 },
+          ]
+        }
+      });
+
+      // Gini chart
+      makeChart('chartGini', {
+        type: 'line',
+        data: {
+          labels: h.ticks,
+          datasets: [
+            { label: 'Attention Gini', data: h.attention_gini, borderColor: '#00ba7c', fill: true, backgroundColor: 'rgba(0,186,124,0.1)', tension: 0.3, pointRadius: 0 },
+            { label: 'Follower Gini', data: h.follower_gini, borderColor: '#f7931a', fill: false, tension: 0.3, pointRadius: 0 },
+          ]
+        }
+      });
+
+      // Communities chart
+      makeChart('chartCommunities', {
+        type: 'line',
+        data: {
+          labels: h.ticks,
+          datasets: [
+            { label: 'Communities', data: h.num_communities, borderColor: '#7c3aed', fill: false, tension: 0.3, pointRadius: 0 },
+          ]
+        }
+      });
+
+      // Language divergence
+      makeChart('chartLanguage', {
+        type: 'line',
+        data: {
+          labels: h.ticks,
+          datasets: [
+            { label: 'Divergence', data: h.language_divergence, borderColor: '#f91880', fill: true, backgroundColor: 'rgba(249,24,128,0.1)', tension: 0.3, pointRadius: 0 },
+          ]
+        }
+      });
+
+      // Controversy & Distortion
+      makeChart('chartControversy', {
+        type: 'line',
+        data: {
+          labels: h.ticks,
+          datasets: [
+            { label: 'Mean Controversy', data: h.mean_controversy, borderColor: '#f7931a', fill: true, backgroundColor: 'rgba(247,147,26,0.1)', tension: 0.3, pointRadius: 0 },
+            { label: 'Mean Distortion', data: h.mean_distortion, borderColor: '#6cb4ee', fill: true, backgroundColor: 'rgba(108,180,238,0.1)', tension: 0.3, pointRadius: 0 },
+          ]
+        }
+      });
+
+      // Bot content fraction
+      makeChart('chartBotContent', {
+        type: 'line',
+        data: {
+          labels: h.ticks,
+          datasets: [
+            { label: 'Bot Content %', data: h.bot_post_fraction, borderColor: '#f7931a', fill: true, backgroundColor: 'rgba(247,147,26,0.1)', tension: 0.3, pointRadius: 0 },
+          ]
+        }
+      });
+
+      // Influencer
+      makeChart('chartInfluencer', {
+        type: 'line',
+        data: {
+          labels: h.ticks,
+          datasets: [
+            { label: 'Influencer Dominance', data: h.influencer_dominance, borderColor: '#ffa15a', fill: true, backgroundColor: 'rgba(255,161,90,0.1)', tension: 0.3, pointRadius: 0 },
+          ]
+        }
+      });
+
+      // Personality distribution
+      const pd = data.personality_distribution || {};
+      const pdColors = {
+        curious: '#636efa', toxic: '#ef553b', viral_chaser: '#00cc96',
+        niche_thinker: '#ab63fa', lurker: '#ffa15a', influencer: '#ff6692',
+        meme_lord: '#b6e880', echo_seeker: '#ff97ff', doom_scroller: '#7b8cff',
+        hot_taker: '#ffb347'
+      };
+      makeChart('chartPersonality', {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(pd),
+          datasets: [{
+            data: Object.values(pd),
+            backgroundColor: Object.keys(pd).map(k => pdColors[k] || '#888'),
+          }]
+        },
+        options: { plugins: { legend: { position: 'bottom' } } }
+      });
+    });
+  }
+
+  function makeChart(id, config) {
+    if (charts[id]) charts[id].destroy();
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    const opts = config.options || {};
+    opts.responsive = true;
+    opts.maintainAspectRatio = false;
+    if (!opts.scales && config.type !== 'doughnut' && config.type !== 'pie') {
+      opts.scales = { x: { grid: { color: '#1d1f23' } }, y: { grid: { color: '#1d1f23' }, beginAtZero: true } };
+    }
+    charts[id] = new Chart(ctx, { ...config, options: opts });
+  }
+</script>
+{% endblock %}

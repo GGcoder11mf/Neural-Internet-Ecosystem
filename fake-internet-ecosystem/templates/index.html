@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% set page = "home" %}
+
+{% block content %}
+<div class="main-header">
+  <h2>🏠 Home</h2>
+  <div class="header-tabs">
+    <div class="header-tab active" onclick="loadFeed('attention')">Top</div>
+    <div class="header-tab" onclick="loadFeed('recent')">Latest</div>
+    <div class="header-tab" onclick="loadFeed('liked')">Liked</div>
+    <div class="header-tab" onclick="loadFeed('controversial')">Spicy</div>
+  </div>
+</div>
+
+<div id="feedEmpty" class="empty-state">
+  <div class="icon">🌐</div>
+  <h3>Welcome to FakeNet</h3>
+  <p>Create a simulation to see the feed come alive</p>
+</div>
+
+<div id="feedContainer"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let currentSort = 'attention';
+  let sseConnected = false;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadFeed(currentSort);
+    loadTrending();
+    loadPlatform();
+    connectSSE();
+  });
+
+  // ===== SSE CONNECTION =====
+  function connectSSE() {
+    if (typeof(EventSource) === 'undefined') return;
+    
+    const source = new EventSource('/api/stream');
+    
+    source.addEventListener('tick', (e) => {
+      const data = JSON.parse(e.data);
+      document.getElementById('tickNum').textContent = data.tick || 0;
+      // Auto-refresh feed if on home page
+      const path = window.location.pathname;
+      if (path === '/' || path === '/index.html') {
+        loadFeedSilent(currentSort);
+      }
+    });
+    
+    source.addEventListener('created', (e) => {
+      const data = JSON.parse(e.data);
+      document.getElementById('tickNum').textContent = '0';
+      loadFeed(currentSort);
+    });
+    
+    source.addEventListener('error', (e) => {
+      // SSE errors are normal on reconnect
+    });
+    
+    source.onopen = () => { sseConnected = true; };
+    source.onerror = () => { sseConnected = false; };
+  }
+
+  // ===== FEED LOADING =====
+  function loadFeed(sort) {
+    currentSort = sort;
+    document.querySelectorAll('.header-tab').forEach(t => t.classList.remove('active'));
+    if (event && event.target) event.target.classList.add('active');
+    
+    fetch(`/api/feed?sort=${sort}&limit=50`)
+      .then(r => r.json())
+      .then(data => {
+        renderFeedData(data);
+      });
+  }
+  
+  function loadFeedSilent(sort) {
+    fetch(`/api/feed?sort=${sort}&limit=50`)
+      .then(r => r.json())
+      .then(data => {
+        renderFeedData(data);
+      })
+      .catch(() => {}); // silent fail
+  }
+  
+  function renderFeedData(data) {
+    const container = document.getElementById('feedContainer');
+    const empty = document.getElementById('feedEmpty');
+    if (!data.posts || data.posts.length === 0) {
+      empty.style.display = '';
+      container.innerHTML = '';
+      return;
+    }
+    empty.style.display = 'none';
+    container.innerHTML = data.posts.map(p => renderPost(p)).join('');
+    document.getElementById('tickNum').textContent = data.tick || 0;
+  }
+
+  function renderPost(p) {
+    const avatarClass = 'avatar-' + (p.author_personality || 'curious');
+    const initials = (p.author_name || '??').substring(0,2).toUpperCase();
+    const isMeme = p.is_meme;
+    const isViral = p.attention_score > 2;
+    const isControversial = p.controversy_score > 0.3;
+    const isRatioed = p.ratio_score > 2;
+    const isDistorted = p.distortion_level > 0.1;
+    const isBot = p.author_is_bot || p.is_bot_post;
+    const timeAgo = p.tick_created === 0 ? 'seed' : `tick ${p.tick_created}`;
+
+    let badges = '';
+    if (isBot) badges += '<span class="post-badge badge-bot">🤖 BOT</span>';
+    if (isMeme) badges += '<span class="post-badge badge-meme">🧬 MEME</span>';
+    if (isViral) badges += '<span class="post-badge badge-viral">🔥 VIRAL</span>';
+    if (isControversial) badges += '<span class="post-badge badge-controversial">🌶️ SPICY</span>';
+    if (isRatioed) badges += '<span class="post-badge badge-ratio">📉 RATIO\'D</span>';
+    if (isDistorted) badges += `<span class="post-badge badge-distort">📢 DISTORTED (${p.distortion_level.toFixed(1)})</span>`;
+    if (p.generation > 0) badges += `<span class="post-badge badge-gen">Gen ${p.generation}</span>`;
+
+    let hashtagsHtml = '';
+    if (p.hashtags && p.hashtags.length > 0) {
+      hashtagsHtml = '<div class="post-hashtags">' + p.hashtags.map(h => `<span class="hashtag-tag">${esc(h)}</span>`).join('') + '</div>';
+    }
+
+    let mutationTags = '';
+    if (p.mutation_count > 0 && p.mutation_types) {
+      mutationTags = '<div style="margin-bottom:8px">' + p.mutation_types.map(t => `<span class="mutation-tag mut-${t}">${t}</span>`).join('') + '</div>';
+    }
+
+    let threadIndicator = '';
+    if (p.thread_id) {
+      threadIndicator = '<div class="thread-indicator">🧵 in reply</div>';
+    }
+    
+    // Image section
+    let imageHtml = '';
+    if (p.image_path) {
+      imageHtml = `<div class="post-image-container"><img class="post-image" src="/static/${esc(p.image_path)}" alt="meme" loading="lazy" onerror="this.style.display='none'"></div>`;
+    }
+
+    return `
+    <div class="post fade-in ${isBot ? 'post-bot' : ''}">
+      <div class="post-header">
+        <div class="post-avatar ${avatarClass}">${isBot ? '🤖' : initials}</div>
+        <div class="post-author">
+          <span class="post-author-name">${esc(p.author_name)}${isBot ? ' <span class="bot-check">✓</span>' : ''}</span>
+          <span class="post-author-handle">@${esc(p.author_id)} · ${timeAgo}</span>
+        </div>
+        ${badges}
+      </div>
+      ${threadIndicator}
+      <div class="post-text">${esc(p.text)}</div>
+      ${imageHtml}
+      ${hashtagsHtml}
+      ${mutationTags}
+      <div class="post-actions">
+        <div class="post-action reply"><span class="icon">💬</span> ${p.replies}</div>
+        <div class="post-action retweet"><span class="icon">🔁</span> ${p.reposts}</div>
+        <div class="post-action like"><span class="icon">❤️</span> ${p.likes}</div>
+        <div class="post-action"><span class="icon">👁️</span> ${p.views}</div>
+        <div class="post-action"><span class="icon">⚡</span> ${p.attention_score}</div>
+      </div>
+    </div>`;
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s || '';
+    return d.innerHTML;
+  }
+</script>
+{% endblock %}
